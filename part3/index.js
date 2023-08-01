@@ -19,6 +19,7 @@ function customMorganFormat(tokens, req, res) {
 app.use(cors())
 app.use(express.json())
 app.use(morgan(customMorganFormat))
+app.use(express.static('build'))
 
 let persons = [
   {
