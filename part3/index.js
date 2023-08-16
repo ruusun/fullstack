@@ -114,6 +114,18 @@ app.put('/api/persons/:id', (request, response, next) => {
     .catch(error => next(error))
 })
 
+app.get('/info', (request, response, next) => {
+  const now = Date();
+  Person.countDocuments({})
+  .then(n=>{
+  if (now && n) {
+    response.json(`Phonebook has info for ${n} people ${now}`);
+  } else {
+    response.status(404).end()
+  }})
+  .catch(error=>next(error))
+  })
+
 app.use(errorHandler)
 app.use(unknownEndpoint)
 
