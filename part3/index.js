@@ -1,6 +1,6 @@
 const express = require('express')
 const app = express()
-const morgan=require("morgan")
+const morgan=require('morgan')
 const cors = require('cors')
 
 require('dotenv').config()
@@ -17,20 +17,21 @@ function customMorganFormat(tokens, req, res) {
     tokens['response-time'](req, res),
     'ms',
     JSON.stringify(req.body)
-  ].join(' ');
+  ].join(' ')
 }
 
-const errorHandler = (error, request, response, next) => {
+const errorHandler = (error, response, next) => {
   console.error(error.message)
 
   if (error.name === 'CastError') {
     return response.status(400).send({ error: 'malformatted id' })
+  } else if (error.name === 'ValidationError') {
+    return response.status(400).json({ error: error.message })
   }
-
   next(error)
 }
 
-const unknownEndpoint = (request, response) => {
+const unknownEndpoint = (response) => {
   response.status(404).send({ error: 'unknown endpoint' })
 }
 
@@ -39,36 +40,15 @@ app.use(express.json())
 app.use(express.static('build'))
 app.use(morgan(customMorganFormat))
 
-let persons = [
-]
 
-
-app.get('/api/persons', (req, res) => {
-  Person.find({}).then(p=>{
+app.get('/api/persons', (res) => {
+  Person.find({}).then(p => {
     res.json(p)
   })
 })
 
-app.post('/api/persons', (request, response) => {
+app.post('/api/persons', (request, response, next) => {
   const body = request.body
-
-  if (body.name === undefined) {
-    return response.status(400).json({ 
-      error: 'name missing' 
-    })
-  }
-
-  else if (body.number === undefined) {
-    return response.status(400).json({ 
-      error: 'number missing' 
-    })
-  }
-
-  else if (persons.map(p=>p.name).includes(body.name)) {
-    return response.status(400).json({ 
-      error: 'name must be unique' 
-    })
-  }
 
   const person = new Person({
     name: body.name,
@@ -78,6 +58,7 @@ app.post('/api/persons', (request, response) => {
   person.save().then(p => {
     response.json(p)
   })
+    .catch(error => next(error))
 })
 
 app.get('/api/persons/:id', (request, response, next) => {
@@ -88,43 +69,41 @@ app.get('/api/persons/:id', (request, response, next) => {
       response.status(404).end()
     }
   })
-  .catch(error => next(error))
-  })
+    .catch(error => next(error))
+})
 
 app.delete('/api/persons/:id', (request, response, next) => {
   Person.findByIdAndRemove(request.params.id)
-  .then(result => {
-    response.status(204).end()
-  })
-  .catch(error=>next(error))
+    .then(result => {
+      response.status(204).end()
+    })
+    .catch(error => next(error))
 })
 
 app.put('/api/persons/:id', (request, response, next) => {
-  const body = request.body
+  const { name, number } = request.body
 
-  const person = {
-    name: body.name,
-    number: body.number,
-  }
-
-  Person.findByIdAndUpdate(request.params.id, person, { new: true })
+  Person.findByIdAndUpdate(
+    request.params.id,
+    { name, number },
+    { new: true, runValidators: true, context: 'query' })
     .then(updatePerson => {
       response.json(updatePerson)
     })
     .catch(error => next(error))
 })
 
-app.get('/info', (request, response, next) => {
-  const now = Date();
+app.get('/info', ( response, next) => {
+  const now = Date()
   Person.countDocuments({})
-  .then(n=>{
-  if (now && n) {
-    response.json(`Phonebook has info for ${n} people ${now}`);
-  } else {
-    response.status(404).end()
-  }})
-  .catch(error=>next(error))
-  })
+    .then(n => {
+      if (now && n) {
+        response.json(`Phonebook has info for ${n} people ${now}`)
+      } else {
+        response.status(404).end()
+      }})
+    .catch(error => next(error))
+})
 
 app.use(errorHandler)
 app.use(unknownEndpoint)
